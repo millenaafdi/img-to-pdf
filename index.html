@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juntar Imagens em PDF</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #2ea44f;
+            --hover-color: #2c974b;
+            --bg-color: #f6f8fa;
+            --text-color: #24292f;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+            border: 1px solid #d0d7de;
+        }
+        input[type="file"] {
+            display: block;
+            margin: 1.5rem auto;
+            font-size: 14px;
+        }
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            width: 100%;
+        }
+        button:hover {
+            background-color: var(--hover-color);
+        }
+        button:disabled {
+            background-color: #94d3a2;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 1rem;
+            font-size: 14px;
+            font-weight: 500;
+            color: #57606a;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>Imagens para PDF</h2>
+        <p style="font-size: 14px; color: #57606a;">Selecione seus arquivos JPG ou PNG. O processamento é feito 100% no seu navegador.</p>
+        
+        <input type="file" id="fileInput" accept="image/png, image/jpeg, image/jpg" multiple>
+        <button id="convertBtn" onclick="gerarPDF()">Criar PDF</button>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        async function gerarPDF() {
+            const fileInput = document.getElementById('fileInput');
+            const statusText = document.getElementById('status');
+            const btn = document.getElementById('convertBtn');
+            const files = fileInput.files;
+
+            if (files.length === 0) {
+                statusText.style.color = "#cf222e";
+                statusText.innerText = "Por favor, selecione pelo menos uma imagem.";
+                return;
+            }
+
+            // Atualiza UI
+            btn.disabled = true;
+            statusText.style.color = "#57606a";
+            statusText.innerText = "Processando imagens, aguarde...";
+
+            try {
+                // Inicializa o jsPDF
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('p', 'mm', 'a4'); // Retrato, milímetros, formato A4
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const imgData = await lerArquivo(file);
+                    
+                    // Adiciona nova página a partir da segunda imagem
+                    if (i > 0) {
+                        pdf.addPage();
+                    }
+
+                    // Pega as propriedades da imagem para manter a proporção
+                    const imgProps = pdf.getImageProperties(imgData);
+                    const ratio = imgProps.width / imgProps.height;
+                    
+                    let calcWidth = pdfWidth;
+                    let calcHeight = pdfWidth / ratio;
+
+                    // Se a imagem ficar mais alta que a página A4, ajustamos pela altura
+                    if (calcHeight > pdfHeight) {
+                        calcHeight = pdfHeight;
+                        calcWidth = pdfHeight * ratio;
+                    }
+
+                    // Centraliza a imagem na página
+                    const x = (pdfWidth - calcWidth) / 2;
+                    const y = (pdfHeight - calcHeight) / 2;
+
+                    // Detecta o formato pelo tipo do arquivo
+                    const format = file.type === 'image/png' ? 'PNG' : 'JPEG';
+                    pdf.addImage(imgData, format, x, y, calcWidth, calcHeight);
+                }
+
+                // Baixa o arquivo gerado
+                pdf.save('resultado_imagens.pdf');
+                
+                statusText.style.color = "#2ea44f";
+                statusText.innerText = "Sucesso! Download iniciado.";
+            } catch (error) {
+                console.error(error);
+                statusText.style.color = "#cf222e";
+                statusText.innerText = "Ocorreu um erro ao processar as imagens.";
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // Função auxiliar para transformar o arquivo em Base64
+        function lerArquivo(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject(new Error("Falha ao ler o arquivo"));
+                reader.readAsDataURL(file);
+            });
+        }
+    </script>
+</body>
+</html>
